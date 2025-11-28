@@ -1,0 +1,190 @@
+/**
+ * This Firestore Security Ruleset is designed for the Safety Guardian application.
+ *
+ * Core Philosophy:
+ * The security model is based on a strict user-ownership principle for personal data,
+ * combined with a Database-Based Access Control (DBAC) system for roles like
+ * 'Supervisor' and 'SafetyManager'. This ensures that users can only access their
+ * own information, while allowing privileged roles to view and manage specific data,
+ * such as safety checklists, as part of the application's workflow.
+ *
+ * Data Structure:
+ * - /users/{userId}: Private user profile data.
+ * - /users/{userId}/checklists/{checklistId}: Checklists created by a specific user.
+ * - /checklist_templates: Global, read-only templates available to all users.
+ * - /roles_supervisor, /roles_safetymanager: Collections used for DBAC lookups. The
+ *   existence of a document in these collections grants a user the corresponding role.
+ *
+ * Key Security Decisions:
+ * - User Isolation: A user can only access documents under their own path (`/users/{userId}`).
+ *   Listing all users is explicitly disallowed to prevent user enumeration.
+ * - Role-Based Access: Supervisors and Safety Managers are granted read and update
+ *   permissions on checklists to facilitate approval workflows. These roles are
+ *   managed in dedicated collections.
+ * - Read-Only Global Data: Checklist templates are readable by all signed-in users but
+ *   are not writable from the client, ensuring their integrity.
+ * - Secure Role Management: The role collections (`/roles_*`) are locked down entirely
+ *   from client-side writes. Roles must be assigned using a trusted server environment
+ *   (e.g., Cloud Functions or the Admin SDK) to prevent self-escalation of privileges.
+ * - Denormalization for Authorization: Checklists contain a `userId` field, and roles
+ *   are stored in separate collections. This avoids costly and slow `get()` calls in
+ *   rules, leading to better performance and simpler logic.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions to abstract and simplify rule logic.
+
+    /**
+     * Checks if a user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the currently authenticated user's UID matches the given userId.
+     * This is the primary function for enforcing document ownership.
+     * @param userId The user ID to check against the authenticated user's UID.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * Checks if the document being accessed already exists.
+     * Crucial for protecting against writes to non-existent paths.
+     */
+    function isExistingDoc() {
+      return resource != null;
+    }
+
+    /**
+     * Combines ownership and existence checks for update/delete operations.
+     * @param userId The user ID to check for ownership.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && isExistingDoc();
+    }
+
+    /**
+     * Checks if the requesting user has the 'Supervisor' role.
+     * This is determined by the existence of a document in the roles_supervisor collection.
+     */
+    function isSupervisor() {
+      return exists(/databases/$(database)/documents/roles_supervisor/$(request.auth.uid));
+    }
+
+    /**
+     * Checks if the requesting user has the 'SafetyManager' role.
+     * This is determined by the existence of a document in the roles_safetymanager collection.
+     */
+    function isSafetyManager() {
+      return exists(/databases/$(database)/documents/roles_safetymanager/$(request.auth.uid));
+    }
+
+    /**
+     * Determines if a user can view a checklist. Access is granted to the
+     * owner, supervisors, and safety managers.
+     * @param userId The ID of the checklist's owner.
+     */
+    function canViewChecklist(userId) {
+      return isOwner(userId) || isSupervisor() || isSafetyManager();
+    }
+
+    /**
+     * @description
+     *   Manages user profile documents.
+     *   - Only the authenticated user can create, read, update, or delete their own profile.
+     *   - Listing users is disallowed to prevent user enumeration.
+     * @path /users/{userId}
+     * @allow (create) A new user with auth.uid 'user_abc' creating their own document at /users/user_abc.
+     * @deny (get) A user with auth.uid 'user_xyz' trying to read /users/user_abc.
+     * @principle Restricts access to a user's own data tree.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+
+      /**
+       * @description
+       *   Manages a user's collection of safety checklists.
+       *   - The owner can perform all actions on their own checklists.
+       *   - Supervisors and Safety Managers can read and update any user's checklist
+       *     (e.g., to approve or reject them) but cannot create or delete them.
+       * @path /users/{userId}/checklists/{checklistId}
+       * @allow (get) A Supervisor reading a checklist at /users/user_abc/checklists/checklist_123.
+       * @deny (delete) A Supervisor trying to delete /users/user_abc/checklists/checklist_123.
+       * @principle Enforces document ownership for creation/deletion, while allowing role-based collaborative access for reads and updates.
+       */
+      match /checklists/{checklistId} {
+        allow get: if canViewChecklist(userId);
+        allow list: if canViewChecklist(userId);
+        allow create: if isOwner(userId) && request.resource.data.userId == userId;
+        allow update: if (isExistingOwner(userId) || ((isSupervisor() || isSafetyManager()) && isExistingDoc())) && request.resource.data.userId == resource.data.id;
+        allow delete: if isExistingOwner(userId);
+      }
+    }
+
+    /**
+     * @description
+     *   Stores global checklist templates.
+     *   - All signed-in users can read and list these templates.
+     *   - All write operations are disallowed from the client to ensure template integrity.
+     *     Templates should be managed through a trusted admin environment.
+     * @path /checklist_templates/{checklistTemplateId}
+     * @allow (list) Any authenticated user listing all documents in the collection.
+     * @deny (create) Any user trying to create a new checklist template.
+     * @principle Secures globally shared data by making it read-only for clients.
+     */
+    match /checklist_templates/{checklistTemplateId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description
+     *   Role-granting collection for Supervisors. The existence of a document grants the role.
+     *   - This collection is completely locked down from client access.
+     *   - Roles MUST be managed by a trusted server environment (e.g., Cloud Functions)
+     *     to prevent users from elevating their own privileges.
+     * @path /roles_supervisor/{userId}
+     * @allow (get) No client-side reads are permitted.
+     * @deny (create) A user trying to add themselves to /roles_supervisor/{their_own_uid}.
+     * @principle Prevents privilege escalation by securing role-granting collections.
+     */
+    match /roles_supervisor/{userId} {
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description
+     *   Role-granting collection for Safety Managers. The existence of a document grants the role.
+     *   - This collection is completely locked down from client access.
+     *   - Roles MUST be managed by a trusted server environment (e.g., Cloud Functions)
+     *     to prevent users from elevating their own privileges.
+     * @path /roles_safetymanager/{userId}
+     * @allow (get) No client-side reads are permitted.
+     * @deny (create) A user trying to add themselves to /roles_safetymanager/{their_own_uid}.
+     * @principle Prevents privilege escalation by securing role-granting collections.
+     */
+    match /roles_safetymanager/{userId} {
+      allow get: if false;
+      allow list: if false;
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}
