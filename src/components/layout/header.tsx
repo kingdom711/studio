@@ -1,11 +1,9 @@
-'use client';
-
-import { useAuth } from '@/app/providers/auth-provider';
+import { useAuth } from '@/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { signOut } from 'firebase/auth';
 import { useAuth as useFirebaseAuth } from '@/firebase';
 import { LogOut, ShieldCheck, UserCircle } from 'lucide-react';
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,7 +33,7 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 max-w-screen-2xl items-center">
-        <Link href="/" className="mr-6 flex items-center space-x-2">
+        <Link to="/" className="mr-6 flex items-center space-x-2">
           <ShieldCheck className="h-6 w-6 text-primary" />
           <span className="font-bold sm:inline-block">Safety Guardian</span>
         </Link>

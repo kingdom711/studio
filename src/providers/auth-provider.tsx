@@ -1,5 +1,3 @@
-'use client';
-
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import type { AppUser } from '@/lib/types';
@@ -65,3 +63,4 @@ export const useAuth = () => {
   }
   return context;
 };
+

@@ -1,11 +1,9 @@
-'use client';
-
 import { useEffect, useState } from 'react';
 import { collection, getDocs, query } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import type { ChecklistTemplate } from '@/lib/types';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowRight, HardHat, Ladder, Wind } from 'lucide-react';
 
@@ -15,7 +13,7 @@ const workTypeIcons: { [key: string]: React.ReactNode } = {
     '밀폐공간 작업': <Wind className="h-8 w-8 text-primary" />,
 }
 
-export default function NewChecklistPage() {
+export default function ChecklistNewPage() {
   const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const db = useFirestore();
@@ -56,21 +54,19 @@ export default function NewChecklistPage() {
             </>
           ) : (
             templates.map(template => (
-              <Link key={template.id} href={`/checklists/${template.id}?new=true`} legacyBehavior>
-                <a className="block">
-                    <Card className="hover:border-primary hover:shadow-lg transition-all">
-                        <CardHeader className="flex flex-row items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                {workTypeIcons[template.workType] || <HardHat className="h-8 w-8 text-primary" />}
-                                <div>
-                                    <CardTitle>{template.workType}</CardTitle>
-                                    <CardDescription>Version {template.version}</CardDescription>
-                                </div>
+              <Link key={template.id} to={`/checklists/${template.id}?new=true`}>
+                <Card className="hover:border-primary hover:shadow-lg transition-all">
+                    <CardHeader className="flex flex-row items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            {workTypeIcons[template.workType] || <HardHat className="h-8 w-8 text-primary" />}
+                            <div>
+                                <CardTitle>{template.workType}</CardTitle>
+                                <CardDescription>Version {template.version}</CardDescription>
                             </div>
-                            <ArrowRight className="h-5 w-5 text-muted-foreground" />
-                        </CardHeader>
-                    </Card>
-                </a>
+                        </div>
+                        <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                    </CardHeader>
+                </Card>
               </Link>
             ))
           )}
@@ -79,3 +75,4 @@ export default function NewChecklistPage() {
     </div>
   );
 }
+

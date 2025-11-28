@@ -1,26 +1,13 @@
-'use client';
-
-import { useAuth } from '@/app/providers/auth-provider';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { useEffect, useState, useMemo } from 'react';
-import type { Checklist } from '@/lib/types';
+import { useMemo } from 'react';
 import ChecklistList from '@/components/checklist/checklist-list';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { DashboardShell } from '@/components/layout/dashboard-shell';
+import { useChecklistQuery } from '@/hooks/use-checklist-query';
+import { Button } from '@/components/ui/button';
+import { RefreshCw } from 'lucide-react';
 
 export default function ManagerDashboard() {
-  const { user } = useAuth();
-  const db = useFirestore();
-
-  const checklistsQuery = useMemoFirebase(() => {
-    if (!user) return null;
-    return query(
-      collection(db, 'checklists'),
-      orderBy('submittedAt', 'desc')
-    );
-  }, [db, user]);
-
-  const { data: checklists, loading } = useCollection<Checklist>(checklistsQuery);
+  const { data: checklists, loading, refresh } = useChecklistQuery('Manager');
 
   const sortedChecklists = useMemo(() => {
     if (!checklists) return [];
@@ -38,21 +25,24 @@ export default function ManagerDashboard() {
   }, [checklists]);
   
   return (
-    <div className="container py-10">
-       <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight">Safety Manager Dashboard</h1>
-          <p className="text-muted-foreground">Monitor overall workplace safety and high-risk activities.</p>
-        </div>
-
+    <DashboardShell
+      title="Safety Manager Dashboard"
+      description="Monitor overall workplace safety and high-risk activities."
+    >
       <Card>
-        <CardHeader>
-          <CardTitle>All Checklists</CardTitle>
-          <CardDescription>Prioritized list of all checklists. High-risk items are shown first.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>All Checklists</CardTitle>
+            <CardDescription>Prioritized list of all checklists. High-risk items are shown first.</CardDescription>
+          </div>
+          <Button variant="outline" size="icon" onClick={refresh} disabled={loading}>
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
         </CardHeader>
         <CardContent>
           <ChecklistList checklists={sortedChecklists} loading={loading} isManagerView={true} />
         </CardContent>
       </Card>
-    </div>
+    </DashboardShell>
   );
 }

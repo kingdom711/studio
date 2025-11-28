@@ -1,6 +1,5 @@
-'use client';
 import { useEffect, useState } from 'react';
-import { useSearchParams, useParams } from 'next/navigation';
+import { useSearchParams, useParams } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import type { Checklist, ChecklistTemplate } from '@/lib/types';
@@ -8,8 +7,8 @@ import { Loader2 } from 'lucide-react';
 import ChecklistForm from '@/components/checklist/checklist-form';
 import ChecklistView from '@/components/checklist/checklist-view';
 
-export default function ChecklistPage() {
-  const searchParams = useSearchParams();
+export default function ChecklistDetailPage() {
+  const [searchParams] = useSearchParams();
   const params = useParams();
   const db = useFirestore();
   const id = params.id as string;
@@ -76,3 +75,4 @@ export default function ChecklistPage() {
     </div>
   );
 }
+

@@ -1,11 +1,9 @@
-'use client';
-
-import { useAuth } from '@/app/providers/auth-provider';
+import { useAuth } from '@/providers/auth-provider';
 import LoginPage from '@/components/auth/login-page';
 import DashboardPage from '@/components/dashboard/dashboard-page';
 import { Loader2 } from 'lucide-react';
 
-export default function Home() {
+export default function HomePage() {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -18,3 +16,4 @@ export default function Home() {
 
   return user ? <DashboardPage /> : <LoginPage />;
 }
+

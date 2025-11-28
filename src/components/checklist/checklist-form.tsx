@@ -1,4 +1,3 @@
-'use client';
 import { useState } from 'react';
 import type { ChecklistTemplate, ChecklistResponse } from '@/lib/types';
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -6,15 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { useAuth } from '@/app/providers/auth-provider';
+import { Input } from '@/components/ui/input';
+import { useAuth } from '@/providers/auth-provider';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
-import { useRouter } from 'next/navigation';
-import { Loader2, Camera, AlertCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Loader2, Camera, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { simulateAiAnalysis } from '@/ai/flows/simulate-ai-analysis';
-import Image from 'next/image';
 
 interface ChecklistFormProps {
   template: ChecklistTemplate;
@@ -28,15 +27,20 @@ interface FormValues {
   }>;
 }
 
+/**
+ * Form component for submitting a new safety checklist.
+ * Handles photo uploads and AI-simulated risk analysis for 'No' answers.
+ */
 export default function ChecklistForm({ template }: ChecklistFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const router = useRouter();
+  const navigate = useNavigate();
   const db = useFirestore();
   const storage = getStorage();
   const [submitting, setSubmitting] = useState(false);
   const [photoPreviews, setPhotoPreviews] = useState<{ [key: number]: string }>({});
 
+  // Initialize form with react-hook-form
   const { control, handleSubmit, formState: { errors, isValid } } = useForm<FormValues>({
     mode: 'onChange',
     defaultValues: {
@@ -47,11 +51,13 @@ export default function ChecklistForm({ template }: ChecklistFormProps) {
     },
   });
 
+  // Field array to manage dynamic list of checklist items
   const { fields, update } = useFieldArray({
     control,
     name: 'responses',
   });
 
+  // Creates a preview URL for uploaded photos
   const handlePhotoChange = (index: number, fileList: FileList | null) => {
     if (fileList && fileList[0]) {
       const file = fileList[0];
@@ -61,6 +67,12 @@ export default function ChecklistForm({ template }: ChecklistFormProps) {
     }
   };
 
+  /**
+   * Handles form submission.
+   * 1. Uploads photos to Firebase Storage (if any).
+   * 2. Runs simulated AI analysis on photos.
+   * 3. Saves checklist document to Firestore.
+   */
   const onSubmit = async (data: FormValues) => {
     if (!user) {
       toast({ variant: 'destructive', title: 'You must be logged in.' });
@@ -73,15 +85,19 @@ export default function ChecklistForm({ template }: ChecklistFormProps) {
       let hasRisks = false;
       const processedResponses: ChecklistResponse[] = [];
 
+      // Process each response item
       for (const [index, response] of data.responses.entries()) {
         const processedResponse: ChecklistResponse = {
           itemId: response.itemId,
           answer: response.answer,
         };
         
+        // If answer is 'No', it indicates a risk
         if (response.answer === 'No') {
           hasRisks = true;
           const photoFile = response.photoFile?.[0];
+          
+          // Upload photo and analyze if present
           if (photoFile) {
             toast({ title: `Uploading photo for item ${index + 1}...` });
             const storageRef = ref(storage, `checklists/${template.id}/${user.uid}/${Date.now()}_${photoFile.name}`);
@@ -90,6 +106,7 @@ export default function ChecklistForm({ template }: ChecklistFormProps) {
 
             toast({ title: `Analyzing photo for item ${index + 1}...`});
             
+            // Convert file to Data URI for AI simulation
             const reader = new FileReader();
             const readAsDataURL = new Promise<string>((resolve, reject) => {
                 reader.onload = () => resolve(reader.result as string);
@@ -98,8 +115,10 @@ export default function ChecklistForm({ template }: ChecklistFormProps) {
             });
             const dataUri = await readAsDataURL;
             
+            // Run AI analysis
             const aiResult = await simulateAiAnalysis({ photoDataUri: dataUri });
 
+            // Update overall risk level based on AI result
             if (aiResult.riskLevel === 'Danger') overallRiskLevel = 'Danger';
             if (aiResult.riskLevel === 'Warning' && overallRiskLevel !== 'Danger') overallRiskLevel = 'Warning';
 
@@ -109,6 +128,7 @@ export default function ChecklistForm({ template }: ChecklistFormProps) {
         processedResponses.push(processedResponse);
       }
 
+      // Save to Firestore
       await addDoc(collection(db, 'checklists'), {
         templateId: template.id,
         workType: template.workType,
@@ -123,7 +143,7 @@ export default function ChecklistForm({ template }: ChecklistFormProps) {
       });
 
       toast({ title: 'Success!', description: 'Your checklist has been submitted.' });
-      router.push('/');
+      navigate('/');
     } catch (error: any) {
       console.error(error);
       toast({ variant: 'destructive', title: 'Submission failed.', description: error.message });
@@ -133,73 +153,108 @@ export default function ChecklistForm({ template }: ChecklistFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="max-w-3xl mx-auto">
-      <Card>
+    <form onSubmit={handleSubmit(onSubmit)} className="max-w-3xl mx-auto space-y-8">
+      {/* Header with Template Info */}
+      <Card className="border-t-4 border-t-primary shadow-lg">
         <CardHeader>
-          <CardTitle className="text-2xl">{template.workType}</CardTitle>
-          <CardDescription>Complete all required items before starting your work.</CardDescription>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-primary/10 rounded-lg">
+                <CheckCircle2 className="h-6 w-6 text-primary" />
+            </div>
+            <CardTitle className="text-3xl">{template.workType}</CardTitle>
+          </div>
+          <CardDescription className="text-base">
+            Please complete all required items below. Ensure safety protocols are followed.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+      </Card>
+
+      {/* Dynamic Form Fields */}
+      <div className="space-y-4">
           {fields.map((field, index) => {
             const templateItem = template.items[index];
             const response = control.getValues(`responses.${index}`);
+            const isRisk = response.answer === 'No';
+
             return (
-              <Card key={field.id} className={response.answer === 'No' ? 'border-accent' : ''}>
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-start">
-                    <Label htmlFor={`responses.${index}.answer`} className="text-base font-semibold mb-2">
-                      {index + 1}. {templateItem.text}
-                    </Label>
+              <Card 
+                key={field.id} 
+                variant={isRisk ? 'destructive' : 'default'}
+                className={`transition-all duration-300 ${isRisk ? 'shadow-md scale-[1.01]' : 'hover:border-primary/50'}`}
+              >
+                <CardContent className="p-6">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                    <div className="flex-1">
+                        <Label htmlFor={`responses.${index}.answer`} className="text-lg font-medium leading-relaxed cursor-pointer block mb-3">
+                        <span className="text-muted-foreground mr-2">{index + 1}.</span>
+                        {templateItem.text}
+                        </Label>
+                    </div>
+                    
+                    {/* Yes/No Radio Group */}
                     <RadioGroup
                       id={`responses.${index}.answer`}
                       onValueChange={(value: 'Yes' | 'No') => {
                         update(index, { ...response, answer: value });
                       }}
-                      className="flex"
+                      className="flex flex-row gap-2 min-w-fit"
                       value={response.answer || ''}
                     >
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="Yes" id={`yes-${index}`} />
-                        <Label htmlFor={`yes-${index}`}>Yes</Label>
+                      <div className={`flex items-center space-x-2 border rounded-md p-3 transition-colors ${response.answer === 'Yes' ? 'bg-green-50 border-green-200 dark:bg-green-900/20' : 'hover:bg-accent'}`}>
+                        <RadioGroupItem value="Yes" id={`yes-${index}`} className="text-green-600 border-green-600" />
+                        <Label htmlFor={`yes-${index}`} className="cursor-pointer font-medium">Yes</Label>
                       </div>
-                      <div className="flex items-center space-x-2">
-                        <RadioGroupItem value="No" id={`no-${index}`} />
-                        <Label htmlFor={`no-${index}`}>No</Label>
+                      <div className={`flex items-center space-x-2 border rounded-md p-3 transition-colors ${response.answer === 'No' ? 'bg-destructive/10 border-destructive/30' : 'hover:bg-accent'}`}>
+                        <RadioGroupItem value="No" id={`no-${index}`} className="text-destructive border-destructive" />
+                        <Label htmlFor={`no-${index}`} className="cursor-pointer font-medium">No</Label>
                       </div>
                     </RadioGroup>
                   </div>
-                  {response.answer === 'No' && (
-                    <div className="mt-4 p-4 bg-accent/10 rounded-md border border-dashed border-accent">
-                        <div className="flex items-start gap-2 text-accent mb-2">
-                            <AlertCircle className="h-4 w-4 mt-1 flex-shrink-0"/>
-                            <p className="text-sm font-semibold">
-                                This is a risk factor. Please upload a photo of the area for assessment.
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <div className="relative">
-                                <Input
-                                    id={`photo-${index}`}
-                                    type="file"
-                                    accept="image/*"
-                                    className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
-                                    {...control.register(`responses.${index}.photoFile`)}
-                                    onChange={(e) => handlePhotoChange(index, e.target.files)}
-                                />
-                                <Button type="button" variant="outline" className="pointer-events-none">
-                                    <Camera className="mr-2 h-4 w-4"/>
-                                    Upload Photo
-                                </Button>
+
+                  {/* Photo Upload Section (Conditionally rendered if risk identified) */}
+                  {isRisk && (
+                    <div className="mt-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="p-4 bg-background/50 rounded-lg border border-destructive/20">
+                            <div className="flex items-start gap-3 text-destructive mb-4">
+                                <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0"/>
+                                <div>
+                                    <p className="font-semibold">Safety Risk Identified</p>
+                                    <p className="text-sm opacity-90">
+                                        Please upload a photo of the area for AI safety assessment.
+                                    </p>
+                                </div>
                             </div>
-                            {photoPreviews[index] && (
-                                <Image
-                                    src={photoPreviews[index]}
-                                    alt="Photo preview"
-                                    width={64}
-                                    height={64}
-                                    className="rounded-md object-cover h-16 w-16"
-                                />
-                            )}
+                            
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                <div className="relative w-full sm:w-auto">
+                                    <Input
+                                        id={`photo-${index}`}
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        {...control.register(`responses.${index}.photoFile`)}
+                                        onChange={(e) => handlePhotoChange(index, e.target.files)}
+                                    />
+                                    <Button 
+                                        type="button" 
+                                        variant="outline" 
+                                        onClick={() => document.getElementById(`photo-${index}`)?.click()}
+                                        className="w-full sm:w-auto border-dashed border-2 hover:border-primary hover:bg-primary/5"
+                                    >
+                                        <Camera className="mr-2 h-4 w-4"/>
+                                        {photoPreviews[index] ? 'Change Photo' : 'Upload Evidence'}
+                                    </Button>
+                                </div>
+                                {photoPreviews[index] && (
+                                    <div className="relative group">
+                                        <img
+                                            src={photoPreviews[index]}
+                                            alt="Preview"
+                                            className="h-20 w-20 rounded-lg object-cover border shadow-sm"
+                                        />
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                   )}
@@ -207,17 +262,24 @@ export default function ChecklistForm({ template }: ChecklistFormProps) {
               </Card>
             );
           })}
-          <Button type="submit" size="lg" className="w-full" disabled={submitting || !isValid}>
-            {submitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...
-              </>
-            ) : (
-              'Submit Checklist'
-            )}
-          </Button>
-        </CardContent>
-      </Card>
+      </div>
+
+      {/* Submit Button (Sticky) */}
+      <div className="sticky bottom-6 pt-4">
+        <Card className="bg-card/80 backdrop-blur shadow-xl border-t-primary border-t-2">
+            <CardContent className="p-4">
+                <Button type="submit" size="lg" className="w-full text-lg h-12 shadow-md transition-all hover:scale-[1.01]" disabled={submitting || !isValid}>
+                    {submitting ? (
+                    <>
+                        <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Submitting Safety Check...
+                    </>
+                    ) : (
+                    'Submit Safety Checklist'
+                    )}
+                </Button>
+            </CardContent>
+        </Card>
+      </div>
     </form>
   );
 }

@@ -1,44 +1,35 @@
-'use client';
 import type { Checklist, ChecklistTemplate } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
-import { useAuth } from '@/app/providers/auth-provider';
+import { useAuth } from '@/providers/auth-provider';
 import { Button } from '../ui/button';
 import { doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { useRouter } from 'next/navigation';
+import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { Loader2, CheckCircle, XCircle, AlertTriangle, ShieldCheck, Camera } from 'lucide-react';
-import Image from 'next/image';
+import { Loader2, CheckCircle, XCircle, AlertTriangle, Camera, Calendar, User } from 'lucide-react';
+import { StatusBadge } from '@/components/shared/status-badge';
+import { formatDate } from '@/lib/utils';
 
 interface ChecklistViewProps {
   checklist: Checklist;
 }
 
-const statusVariantMap: { [key: string]: 'default' | 'secondary' | 'destructive' | 'outline' } = {
-  submitted: 'default',
-  approved: 'secondary',
-  rejected: 'destructive',
-  'in-progress': 'outline',
-};
-
-const riskLevelVariantMap: { [key: string]: 'default' | 'secondary' | 'destructive' } = {
-    Safe: 'secondary',
-    Warning: 'default',
-    Danger: 'destructive',
-}
-
+/**
+ * Displays the details of a submitted checklist.
+ * Includes logic for supervisors to approve or reject the submission.
+ */
 export default function ChecklistView({ checklist }: ChecklistViewProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const router = useRouter();
+  const navigate = useNavigate();
   const db = useFirestore();
   const [template, setTemplate] = useState<ChecklistTemplate | null>(null);
   const [loading, setLoading] = useState(false);
   const [templateLoading, setTemplateLoading] = useState(true);
 
+  // Fetch the template associated with this checklist to get item text/questions
   useEffect(() => {
     const fetchTemplate = async () => {
       setTemplateLoading(true);
@@ -58,6 +49,10 @@ export default function ChecklistView({ checklist }: ChecklistViewProps) {
     fetchTemplate();
   }, [checklist.templateId, toast, db]);
 
+  /**
+   * Updates the status of the checklist (Approve/Reject).
+   * Only available to users with the 'Supervisor' role.
+   */
   const handleUpdateStatus = async (status: 'approved' | 'rejected') => {
     setLoading(true);
     try {
@@ -70,69 +65,126 @@ export default function ChecklistView({ checklist }: ChecklistViewProps) {
       }
       await updateDoc(checklistRef, updateData);
       toast({ title: 'Success', description: `Checklist has been ${status}.` });
-      router.push('/');
+      navigate('/');
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message });
       setLoading(false);
     }
   };
 
+  // Helper to get the question text for a given item ID
   const getItemText = (itemId: string) => {
     return template?.items.find(item => item.id === itemId)?.text || 'Unknown Item';
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <Card>
+    <div className="max-w-4xl mx-auto space-y-6">
+      {/* Header Card: Contains high-level metadata (User, Date, Overall Status) */}
+      <Card className="border-l-4 border-l-primary shadow-md">
         <CardHeader>
-          <CardTitle className="text-2xl">{checklist.workType}</CardTitle>
-          <CardDescription>
-            Submitted by {checklist.userName} on {checklist.createdAt ? format(checklist.createdAt.toDate(), 'PPP') : 'N/A'}
-          </CardDescription>
-          <div className="flex flex-wrap gap-2 pt-2">
-            <Badge variant={statusVariantMap[checklist.status]}>Status: {checklist.status}</Badge>
-            {checklist.hasRisks && <Badge variant="destructive"><AlertTriangle className='h-3 w-3 mr-1'/> Contains Risks</Badge>}
-            {checklist.riskLevel && <Badge variant={riskLevelVariantMap[checklist.riskLevel]}>AI Risk: {checklist.riskLevel}</Badge>}
+          <div className="flex justify-between items-start">
+            <div>
+                <CardTitle className="text-3xl mb-2">{checklist.workType}</CardTitle>
+                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                        <User className="h-4 w-4" />
+                        <span>Submitted by <span className="font-medium text-foreground">{checklist.userName}</span></span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <Calendar className="h-4 w-4" />
+                        <span>{formatDate(checklist.createdAt)}</span>
+                    </div>
+                </div>
+            </div>
+            <div className="flex flex-col items-end gap-2">
+                <StatusBadge status={checklist.status} type="status" />
+                {checklist.riskLevel && (
+                    <StatusBadge status={checklist.riskLevel} type="risk" />
+                )}
+            </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-            {templateLoading ? <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" /> :
-                checklist.responses.map((response, index) => (
-                    <Card key={index} className={response.answer === 'No' ? 'border-accent bg-accent/5' : ''}>
-                        <CardContent className="p-4 space-y-3">
-                            <div className="flex justify-between items-center">
-                                <p className="font-semibold">{index + 1}. {getItemText(response.itemId)}</p>
-                                <Badge variant={response.answer === 'No' ? 'destructive' : 'secondary'} className='capitalize w-16 justify-center flex-shrink-0'>
-                                  {response.answer === 'Yes' ? <CheckCircle className='h-4 w-4 mr-1'/> : <XCircle className='h-4 w-4 mr-1'/>}
-                                  {response.answer}
-                                </Badge>
-                            </div>
-                            {response.answer === 'No' && response.photoUrl && (
-                                <div className="pl-4 border-l-2 border-accent ml-2">
-                                    <h4 className="font-semibold flex items-center gap-2"><Camera className='h-4 w-4'/>Uploaded Photo</h4>
-                                    <div className="mt-2">
-                                        <Image src={response.photoUrl} alt={`Photo for item ${index+1}`} width={256} height={256} className="rounded-md object-cover" />
-                                    </div>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                ))
-            }
-        </CardContent>
-        {user?.role === 'Supervisor' && checklist.status === 'submitted' && (
-          <CardFooter className="flex justify-end gap-2">
-            <Button variant="destructive" onClick={() => handleUpdateStatus('rejected')} disabled={loading}>
-              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
-              Reject
-            </Button>
-            <Button variant="default" onClick={() => handleUpdateStatus('approved')} disabled={loading}>
-              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-              Approve
-            </Button>
-          </CardFooter>
-        )}
       </Card>
+
+      {/* Checklist Items List */}
+      <div className="grid gap-4">
+        <h3 className="text-lg font-semibold ml-1">Checklist Items</h3>
+        {templateLoading ? (
+            <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        ) : (
+            checklist.responses.map((response, index) => (
+                <Card 
+                    key={index} 
+                    variant={response.answer === 'No' ? 'destructive' : 'default'}
+                    className={`transition-all ${response.answer === 'No' ? 'border-destructive/50' : ''}`}
+                >
+                    <CardContent className="p-6">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="flex-1">
+                                <div className="flex items-start gap-3">
+                                    <span className="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full bg-muted text-xs font-medium">
+                                        {index + 1}
+                                    </span>
+                                    <p className="font-medium text-lg leading-tight">{getItemText(response.itemId)}</p>
+                                </div>
+                            </div>
+                            
+                            <Badge 
+                                variant={response.answer === 'No' ? 'destructive' : 'secondary'} 
+                                className={`px-4 py-1 text-sm font-medium capitalize flex-shrink-0 ${response.answer === 'Yes' ? 'bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-300' : ''}`}
+                            >
+                                {response.answer === 'Yes' ? <CheckCircle className='h-4 w-4 mr-2'/> : <XCircle className='h-4 w-4 mr-2'/>}
+                                {response.answer}
+                            </Badge>
+                        </div>
+
+                        {/* Display uploaded photo for risk items */}
+                        {response.answer === 'No' && response.photoUrl && (
+                            <div className="mt-6 p-4 bg-background/50 rounded-lg border border-border/50">
+                                <h4 className="font-semibold flex items-center gap-2 text-destructive mb-3">
+                                    <Camera className='h-4 w-4'/>
+                                    Risk Documentation
+                                </h4>
+                                <div className="relative aspect-video w-full max-w-md rounded-lg overflow-hidden border shadow-sm">
+                                    <img 
+                                        src={response.photoUrl} 
+                                        alt={`Risk documentation for item ${index+1}`} 
+                                        className="object-cover w-full h-full hover:scale-105 transition-transform duration-500"
+                                    />
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            ))
+        )}
+      </div>
+
+      {/* Supervisor Actions: Sticky bottom bar for approval/rejection */}
+      {user?.role === 'Supervisor' && checklist.status === 'submitted' && (
+        <div className="sticky bottom-6 z-10">
+            <Card className="shadow-xl border-t-4 border-t-primary bg-card/95 backdrop-blur">
+                <CardContent className="p-4 flex justify-between items-center">
+                    <div>
+                        <h4 className="font-semibold">Review Action</h4>
+                        <p className="text-sm text-muted-foreground">Approve or reject this checklist submission.</p>
+                    </div>
+                    <div className="flex gap-3">
+                        <Button variant="destructive" size="lg" onClick={() => handleUpdateStatus('rejected')} disabled={loading}>
+                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
+                        Reject
+                        </Button>
+                        <Button variant="default" size="lg" onClick={() => handleUpdateStatus('approved')} disabled={loading} className="bg-green-600 hover:bg-green-700">
+                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                        Approve
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+      )}
     </div>
   );
 }
