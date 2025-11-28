@@ -13,7 +13,7 @@ import {
   signInWithEmailAndPassword,
 } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { useAuth as useFirebaseAuth, useFirestore } from '@/firebase';
 import { Loader2 } from 'lucide-react';
 import { ROLES, TEST_ACCOUNTS } from '@/lib/constants';
 import type { UserRole } from '@/lib/types';
@@ -43,6 +43,8 @@ interface AuthFormProps {
 export default function AuthForm({ isSignUp = false }: AuthFormProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const auth = useFirebaseAuth();
+  const db = useFirestore();
 
   const {
     register,

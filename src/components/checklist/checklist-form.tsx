@@ -8,11 +8,11 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useAuth } from '@/app/providers/auth-provider';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { db, storage } from '@/lib/firebase';
+import { useFirestore } from '@/firebase';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Loader2, Camera, AlertCircle } from 'lucide-react';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { simulateAiAnalysis } from '@/ai/flows/simulate-ai-analysis';
 import Image from 'next/image';
 
@@ -32,6 +32,8 @@ export default function ChecklistForm({ template }: ChecklistFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
+  const db = useFirestore();
+  const storage = getStorage();
   const [submitting, setSubmitting] = useState(false);
   const [photoPreviews, setPhotoPreviews] = useState<{ [key: number]: string }>({});
 

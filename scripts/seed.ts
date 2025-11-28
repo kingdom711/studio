@@ -1,6 +1,6 @@
 // To run this script, use: npm run seed
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, writeBatch, getDocs, query } from 'firebase/firestore';
+import { getFirestore, collection, writeBatch, getDocs, query, doc } from 'firebase/firestore';
 import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { config } from 'dotenv';
 import { TEST_ACCOUNTS } from '../src/lib/constants';
@@ -70,7 +70,7 @@ async function seedChecklistTemplates() {
   
   const batch = writeBatch(db);
   checklistTemplates.forEach(template => {
-    const docRef = collection(db, 'checklist_templates').doc(template.id);
+    const docRef = doc(db, 'checklist_templates', template.id);
     batch.set(docRef, template);
   });
   await batch.commit();
@@ -89,8 +89,9 @@ async function seedUsers() {
         const user = userCredential.user;
         console.log(`Created auth user: ${user.uid}`);
         
-        const userDocRef = usersCollection.doc(user.uid);
+        const userDocRef = doc(db, 'users', user.uid);
         batch.set(userDocRef, {
+            id: user.uid,
             name: account.name,
             email: account.email,
             role: role,

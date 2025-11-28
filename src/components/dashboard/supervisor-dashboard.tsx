@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/app/providers/auth-provider';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useFirestore } from '@/firebase';
 import { useEffect, useState } from 'react';
 import type { Checklist } from '@/lib/types';
 import ChecklistList from '@/components/checklist/checklist-list';
@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 export default function SupervisorDashboard() {
   const { user } = useAuth();
+  const db = useFirestore();
   const [checklists, setChecklists] = useState<Checklist[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,7 +33,7 @@ export default function SupervisorDashboard() {
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, db]);
   
   return (
     <div className="container py-10">

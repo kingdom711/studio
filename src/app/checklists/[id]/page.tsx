@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useParams } from 'next/navigation';
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useFirestore } from '@/firebase';
 import type { Checklist, ChecklistTemplate } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 import ChecklistForm from '@/components/checklist/checklist-form';
@@ -11,6 +11,7 @@ import ChecklistView from '@/components/checklist/checklist-view';
 export default function ChecklistPage() {
   const searchParams = useSearchParams();
   const params = useParams();
+  const db = useFirestore();
   const id = params.id as string;
   const isNew = searchParams.get('new') === 'true';
 
@@ -43,7 +44,7 @@ export default function ChecklistPage() {
     };
 
     fetchData();
-  }, [id, isNew]);
+  }, [id, isNew, db]);
 
   if (loading) {
     return (

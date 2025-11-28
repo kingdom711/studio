@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { useAuth } from '@/firebase';
 import { TEST_ACCOUNTS } from '@/lib/constants';
 import type { UserRole } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
@@ -12,6 +12,7 @@ import { Loader2 } from 'lucide-react';
 export default function RoleSwitcher() {
   const [loadingRole, setLoadingRole] = useState<UserRole | null>(null);
   const { toast } = useToast();
+  const auth = useAuth();
 
   const handleLoginAs = async (role: UserRole) => {
     setLoadingRole(role);

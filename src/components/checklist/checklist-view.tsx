@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { useAuth } from '@/app/providers/auth-provider';
 import { Button } from '../ui/button';
 import { doc, getDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useFirestore } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
@@ -34,6 +34,7 @@ export default function ChecklistView({ checklist }: ChecklistViewProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
+  const db = useFirestore();
   const [template, setTemplate] = useState<ChecklistTemplate | null>(null);
   const [loading, setLoading] = useState(false);
   const [templateLoading, setTemplateLoading] = useState(true);
@@ -55,7 +56,7 @@ export default function ChecklistView({ checklist }: ChecklistViewProps) {
       }
     };
     fetchTemplate();
-  }, [checklist.templateId, toast]);
+  }, [checklist.templateId, toast, db]);
 
   const handleUpdateStatus = async (status: 'approved' | 'rejected') => {
     setLoading(true);

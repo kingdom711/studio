@@ -3,7 +3,7 @@
 import { useAuth } from '@/app/providers/auth-provider';
 import { Button } from '@/components/ui/button';
 import { signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { useAuth as useFirebaseAuth } from '@/firebase';
 import { LogOut, ShieldCheck, UserCircle } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -18,6 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 
 export default function Header() {
   const { user } = useAuth();
+  const auth = useFirebaseAuth();
 
   const handleLogout = async () => {
     try {

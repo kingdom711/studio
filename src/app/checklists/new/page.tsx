@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { collection, getDocs, query } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useFirestore } from '@/firebase';
 import type { ChecklistTemplate } from '@/lib/types';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
@@ -18,6 +18,7 @@ const workTypeIcons: { [key: string]: React.ReactNode } = {
 export default function NewChecklistPage() {
   const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
   const [loading, setLoading] = useState(true);
+  const db = useFirestore();
 
   useEffect(() => {
     const fetchTemplates = async () => {
@@ -36,7 +37,7 @@ export default function NewChecklistPage() {
       }
     };
     fetchTemplates();
-  }, []);
+  }, [db]);
 
   return (
     <div className="container py-10">

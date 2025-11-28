@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/app/providers/auth-provider';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useFirestore } from '@/firebase';
 import { useEffect, useState, useMemo } from 'react';
 import type { Checklist } from '@/lib/types';
 import ChecklistList from '@/components/checklist/checklist-list';
@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 export default function ManagerDashboard() {
   const { user } = useAuth();
+  const db = useFirestore();
   const [checklists, setChecklists] = useState<Checklist[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -31,7 +32,7 @@ export default function ManagerDashboard() {
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, db]);
 
   const sortedChecklists = useMemo(() => {
     return [...checklists].sort((a, b) => {
