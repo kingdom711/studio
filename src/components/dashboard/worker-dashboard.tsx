@@ -6,7 +6,7 @@ import { PlusCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/app/providers/auth-provider';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { useEffect, useState } from 'react';
 import type { Checklist } from '@/lib/types';
 import ChecklistList from '@/components/checklist/checklist-list';
@@ -14,29 +14,17 @@ import ChecklistList from '@/components/checklist/checklist-list';
 export default function WorkerDashboard() {
   const { user } = useAuth();
   const db = useFirestore();
-  const [checklists, setChecklists] = useState<Checklist[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!user) return;
-
-    const q = query(
+  const checklistsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(
       collection(db, 'checklists'),
       where('userId', '==', user.uid),
       orderBy('createdAt', 'desc')
     );
+  }, [db, user]);
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const checklistsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Checklist[];
-      setChecklists(checklistsData);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [user, db]);
+  const { data: checklists, loading } = useCollection<Checklist>(checklistsQuery);
 
   return (
     <div className="container py-10">
@@ -59,7 +47,7 @@ export default function WorkerDashboard() {
           <CardDescription>A log of all your submitted safety checklists.</CardDescription>
         </CardHeader>
         <CardContent>
-          <ChecklistList checklists={checklists} loading={loading} />
+          <ChecklistList checklists={checklists || []} loading={loading} />
         </CardContent>
       </Card>
     </div>

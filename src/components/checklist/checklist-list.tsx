@@ -68,7 +68,7 @@ export default function ChecklistList({ checklists, loading, isManagerView = fal
             </TableHeader>
             <TableBody>
                 {checklists.map((checklist) => (
-                <TableRow key={checklist.id} onClick={() => router.push(`/checklists/${checklist.id}`)} className="cursor-pointer">
+                <TableRow key={checklist.id} onClick={() => router.push(`/users/${checklist.userId}/checklists/${checklist.id}`)} className="cursor-pointer">
                     <TableCell>
                         <div className='flex items-center gap-2'>
                         {checklist.hasRisks || checklist.riskLevel === 'Danger' ? <AlertTriangle className="h-5 w-5 text-accent" /> : <ShieldCheck className="h-5 w-5 text-green-600" />}

@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/app/providers/auth-provider';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { useEffect, useState, useMemo } from 'react';
 import type { Checklist } from '@/lib/types';
 import ChecklistList from '@/components/checklist/checklist-list';
@@ -11,30 +11,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 export default function ManagerDashboard() {
   const { user } = useAuth();
   const db = useFirestore();
-  const [checklists, setChecklists] = useState<Checklist[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!user) return;
-
-    const q = query(
+  const checklistsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(
       collection(db, 'checklists'),
       orderBy('submittedAt', 'desc')
     );
+  }, [db, user]);
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const checklistsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Checklist[];
-      setChecklists(checklistsData);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [user, db]);
+  const { data: checklists, loading } = useCollection<Checklist>(checklistsQuery);
 
   const sortedChecklists = useMemo(() => {
+    if (!checklists) return [];
     return [...checklists].sort((a, b) => {
       const aHasPriority = a.hasRisks || a.riskLevel === 'Danger';
       const bHasPriority = b.hasRisks || b.riskLevel === 'Danger';

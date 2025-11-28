@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/app/providers/auth-provider';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { useEffect, useState } from 'react';
 import type { Checklist } from '@/lib/types';
 import ChecklistList from '@/components/checklist/checklist-list';
@@ -11,29 +11,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 export default function SupervisorDashboard() {
   const { user } = useAuth();
   const db = useFirestore();
-  const [checklists, setChecklists] = useState<Checklist[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const q = query(
+  
+  const checklistsQuery = useMemoFirebase(() => {
+    if (!user) return null;
+    return query(
       collection(db, 'checklists'),
       where('status', '==', 'submitted'),
       orderBy('submittedAt', 'desc')
     );
+  }, [db, user]);
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const checklistsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Checklist[];
-      setChecklists(checklistsData);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [user, db]);
+  const { data: checklists, loading } = useCollection<Checklist>(checklistsQuery);
   
   return (
     <div className="container py-10">
@@ -48,7 +36,7 @@ export default function SupervisorDashboard() {
           <CardDescription>These checklists are waiting for your approval.</CardDescription>
         </CardHeader>
         <CardContent>
-          <ChecklistList checklists={checklists} loading={loading} />
+          <ChecklistList checklists={checklists || []} loading={loading} isManagerView={true}/>
         </CardContent>
       </Card>
     </div>
