@@ -1,3 +1,4 @@
+import { memo, useCallback } from 'react';
 import type { Checklist } from '@/lib/types';
 import {
   Table,
@@ -12,6 +13,73 @@ import { Skeleton } from '../ui/skeleton';
 import { AlertTriangle, ShieldCheck } from 'lucide-react';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { formatDate } from '@/lib/utils';
+
+/**
+ * Props for the ChecklistRow component
+ * @property {Checklist} checklist - Individual checklist data
+ * @property {boolean} isManagerView - Flag to show worker column
+ * @property {function} onClick - Click handler for row navigation
+ */
+interface ChecklistRowProps {
+  checklist: Checklist;
+  isManagerView: boolean;
+  onClick: (id: string) => void;
+}
+
+/**
+ * Individual checklist row component.
+ * Memoized to prevent unnecessary re-renders when parent re-renders.
+ */
+const ChecklistRow = memo(function ChecklistRow({ checklist, isManagerView, onClick }: ChecklistRowProps) {
+  const handleClick = useCallback(() => {
+    onClick(checklist.id);
+  }, [checklist.id, onClick]);
+
+  return (
+    <TableRow
+      onClick={handleClick}
+      className="cursor-pointer hover:bg-muted/50 transition-colors"
+    >
+      {/* Risk Level Indicator */}
+      <TableCell>
+        <div className='flex items-center gap-3'>
+          {checklist.hasRisks || checklist.riskLevel === 'Danger' ? (
+            <div className="p-2 bg-destructive/10 rounded-full">
+              <AlertTriangle className="h-4 w-4 text-destructive" />
+            </div>
+          ) : (
+            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full">
+              <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+            </div>
+          )}
+          {checklist.riskLevel && (
+            <StatusBadge status={checklist.riskLevel} type="risk" />
+          )}
+        </div>
+      </TableCell>
+      <TableCell>
+        <span className="font-medium text-base">{checklist.workType}</span>
+      </TableCell>
+      {/* Worker Info (Only for Manager View) */}
+      {isManagerView && (
+        <TableCell>
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+              {checklist.userName.charAt(0)}
+            </div>
+            <span>{checklist.userName}</span>
+          </div>
+        </TableCell>
+      )}
+      <TableCell className="text-muted-foreground">
+        {formatDate(checklist.submittedAt)}
+      </TableCell>
+      <TableCell className="text-right">
+        <StatusBadge status={checklist.status} type="status" />
+      </TableCell>
+    </TableRow>
+  );
+});
 
 /**
  * Props for the ChecklistList component
@@ -31,6 +99,11 @@ interface ChecklistListProps {
  */
 export default function ChecklistList({ checklists, loading, isManagerView = false }: ChecklistListProps) {
   const navigate = useNavigate();
+
+  // Memoize the navigation handler to prevent unnecessary re-renders of ChecklistRow
+  const handleRowClick = useCallback((id: string) => {
+    navigate(`/checklists/${id}`);
+  }, [navigate]);
 
   // Display skeleton loaders while data is fetching
   if (loading) {
@@ -58,65 +131,29 @@ export default function ChecklistList({ checklists, loading, isManagerView = fal
 
   return (
     <div className="rounded-lg border shadow-sm bg-card overflow-hidden">
-        <Table>
-            <TableHeader className="bg-muted/50">
-                <TableRow>
-                <TableHead className='w-[120px]'>Risk Level</TableHead>
-                <TableHead className="font-semibold">Work Type</TableHead>
-                {/* Conditionally render Worker column for Managers/Supervisors */}
-                {isManagerView && <TableHead className="font-semibold">Worker</TableHead>}
-                <TableHead className="font-semibold">Date Submitted</TableHead>
-                <TableHead className="text-right font-semibold">Status</TableHead>
-                </TableRow>
-            </TableHeader>
-            <TableBody>
-                {checklists.map((checklist) => (
-                <TableRow 
-                    key={checklist.id} 
-                    onClick={() => navigate(`/checklists/${checklist.id}`)} 
-                    className="cursor-pointer hover:bg-muted/50 transition-colors"
-                >
-                    {/* Risk Level Indicator */}
-                    <TableCell>
-                        <div className='flex items-center gap-3'>
-                        {checklist.hasRisks || checklist.riskLevel === 'Danger' ? (
-                            <div className="p-2 bg-destructive/10 rounded-full">
-                                <AlertTriangle className="h-4 w-4 text-destructive" />
-                            </div>
-                        ) : (
-                            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-full">
-                                <ShieldCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
-                            </div>
-                        )}
-                        {checklist.riskLevel && (
-                             <StatusBadge status={checklist.riskLevel} type="risk" />
-                        )}
-                        </div>
-                    </TableCell>
-                    <TableCell>
-                        <span className="font-medium text-base">{checklist.workType}</span>
-                    </TableCell>
-                    {/* Worker Info (Only for Manager View) */}
-                    {isManagerView && (
-                        <TableCell>
-                            <div className="flex items-center gap-2">
-                                <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
-                                    {checklist.userName.charAt(0)}
-                                </div>
-                                <span>{checklist.userName}</span>
-                            </div>
-                        </TableCell>
-                    )}
-                    <TableCell className="text-muted-foreground">
-                    {formatDate(checklist.submittedAt)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                        <StatusBadge status={checklist.status} type="status" />
-                    </TableCell>
-                </TableRow>
-                ))}
-            </TableBody>
-        </Table>
+      <Table>
+        <TableHeader className="bg-muted/50">
+          <TableRow>
+            <TableHead className='w-[120px]'>Risk Level</TableHead>
+            <TableHead className="font-semibold">Work Type</TableHead>
+            {/* Conditionally render Worker column for Managers/Supervisors */}
+            {isManagerView && <TableHead className="font-semibold">Worker</TableHead>}
+            <TableHead className="font-semibold">Date Submitted</TableHead>
+            <TableHead className="text-right font-semibold">Status</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {checklists.map((checklist) => (
+            <ChecklistRow
+              key={checklist.id}
+              checklist={checklist}
+              isManagerView={isManagerView}
+              onClick={handleRowClick}
+            />
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }
+

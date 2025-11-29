@@ -5,10 +5,10 @@ import type { ChecklistTemplate } from '@/lib/types';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Link } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowRight, HardHat, Ladder, Wind } from 'lucide-react';
+import { ArrowRight, HardHat, ListChecks, Wind } from 'lucide-react';
 
 const workTypeIcons: { [key: string]: React.ReactNode } = {
-    '사다리 작업': <Ladder className="h-8 w-8 text-primary" />,
+    '사다리 작업': <ListChecks className="h-8 w-8 text-primary" />,
     '고소작업대 작업': <HardHat className="h-8 w-8 text-primary" />,
     '밀폐공간 작업': <Wind className="h-8 w-8 text-primary" />,
 }

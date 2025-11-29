@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Badge } from '@/components/ui/badge';
 
 interface StatusBadgeProps {
@@ -21,11 +22,12 @@ const RISK_VARIANTS: Record<string, "default" | "secondary" | "destructive"> = {
 /**
  * A unified Badge component for displaying Status or Risk levels.
  * Automatically maps status strings to appropriate visual variants (colors).
+ * Memoized to prevent unnecessary re-renders when props haven't changed.
  *
  * @param {string} status - The text to display (e.g. 'submitted', 'Safe')
  * @param {'status' | 'risk'} type - Determines which color mapping to use
  */
-export function StatusBadge({ status, type = 'status' }: StatusBadgeProps) {
+export const StatusBadge = memo(function StatusBadge({ status, type = 'status' }: StatusBadgeProps) {
   let variant: "default" | "secondary" | "destructive" | "outline" = 'outline';
 
   if (type === 'status') {
@@ -35,4 +37,4 @@ export function StatusBadge({ status, type = 'status' }: StatusBadgeProps) {
   }
 
   return <Badge variant={variant}>{status}</Badge>;
-}
+});
