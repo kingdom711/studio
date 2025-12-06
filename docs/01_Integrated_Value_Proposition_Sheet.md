@@ -1,6 +1,6 @@
 # Integrated Value Proposition Sheet (MVP)
 
-본 문서는 **중대재해 멈춰!** 서비스의 MVP 가치 제안을 **고객(Persona) - 솔루션(MVP) - 시장(Market)** 관점에서 통합 정리한 시트입니다.
+본 문서는 **안전의 길** 서비스의 MVP 가치 제안을 **고객(Persona) - 솔루션(MVP) - 시장(Market)** 관점에서 통합 정리한 시트입니다.
 
 ## 1. 통합 Value Proposition Sheet (핵심 3개 Pain 중심)
 
